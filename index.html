@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recomendador de Gêneros de Jogos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* Darker background */
+            background-image: radial-gradient(circle at top right, #1f2937, #111827 70%);
+            color: #d1d5db; /* Lighter gray text */
+            line-height: 1.6;
+        }
+        .card {
+            background-color: #1f2937; /* Card background */
+            border-radius: 0.75rem; /* 12px */
+            padding: 1.5rem; /* 24px */
+            margin-bottom: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
+            border: 1px solid #374151; /* Subtle border */
+        }
+        .results-card { /* Also used for welcome and intro cards */
+            background-color: #1f2937;
+            border-radius: 0.75rem;
+            padding: 2rem; /* 32px */
+            text-align: center;
+            border: 1px solid #374151;
+        }
+        .btn {
+            font-weight: 600;
+            padding: 0.875rem 1.75rem; /* 14px 28px */
+            border-radius: 0.5rem; /* 8px */
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .btn-neutral {
+            background-color: #4b5563; /* Gray-600 */
+            color: white;
+        }
+        .btn-neutral:hover {
+            background-color: #374151; /* Gray-700 */
+        }
+        .btn-primary {
+            background-image: linear-gradient(to right, #10b981, #059669); /* Emerald gradient */
+            color: white;
+        }
+        .btn-primary:hover {
+            background-image: linear-gradient(to right, #059669, #047857);
+            box-shadow: 0 6px 10px rgba(16, 185, 129, 0.3);
+        }
+        label { /* General labels, not radio ones */
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #9ca3af; /* Gray-400 */
+            text-align: left;
+        }
+        input[type="text"], input[type="number"], select {
+            background-color: #374151; /* Gray-700 */
+            border-color: #4b5563; /* Gray-600 */
+            color: #e5e7eb; /* Gray-200 */
+            padding: 0.75rem;
+            border-radius: 0.375rem; /* 6px */
+            width: 100%;
+            border-width: 1px;
+            margin-bottom: 1rem; /* Add margin for spacing between fields */
+        }
+        input[type="text"]:focus, input[type="number"]:focus, select:focus {
+            ring-color: #10b981;
+            border-color: #10b981;
+            outline: 2px solid transparent;
+            outline-offset: 2px;
+            --tw-ring-shadow: 0 0 #0000; /* Tailwind focus reset */
+            box-shadow: 0 0 0 2px #10b981;
+        }
+        .progress-bar-container {
+            width: 100%;
+            background-color: #374151; /* Gray-700 */
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+            overflow: hidden;
+            height: 0.75rem; /* 12px - Reduced height as text is removed */
+        }
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background-image: linear-gradient(to right, #34d399, #10b981); /* Emerald gradient for progress */
+            border-radius: 0.5rem;
+            transition: width 0.4s ease-in-out;
+        }
+        .character-image {
+            width: 180px; /* Fixed width */
+            height: 180px; /* Fixed height */
+            object-fit: cover; /* Ensure image covers the area */
+            border-radius: 50%; /* Circular image */
+            margin: 1.5rem auto;
+            display: block;
+            border: 4px solid #10b981; /* Emerald border */
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
+        }
+        .radio-option {
+            display: inline-block;
+            margin: 0.25rem 0.5rem; /* Adjust spacing */
+        }
+        .radio-option input[type="radio"] {
+            opacity: 0;
+            position: fixed;
+            width: 0;
+        }
+        .radio-option label { /* Radio button labels */
+            display: inline-block;
+            background-color: #374151; /* Gray-700 */
+            color: #d1d5db;
+            padding: 0.6rem 1.2rem;
+            border-radius: 9999px; /* Pill shape */
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
+            border: 1px solid transparent;
+        }
+        .radio-option input[type="radio"]:checked + label {
+            background-color: #10b981; /* Emerald-500 */
+            color: white;
+            border-color: #059669;
+            font-weight: 600;
+        }
+        .radio-option label:hover {
+            background-color: #4b5563; /* Gray-600 */
+            border-color: #6b7280;
+        }
+        .modal {
+            display: none; position: fixed; z-index: 1000;
+            left: 0; top: 0; width: 100%; height: 100%;
+            overflow: auto; background-color: rgba(0,0,0,0.7);
+        }
+        .modal-content {
+            background-color: #1f2937; margin: 10% auto; padding: 2rem;
+            border: 1px solid #374151; border-radius: 0.75rem;
+            width: 90%; max-width: 500px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2), 0 10px 10px -5px rgba(0,0,0,0.1);
+        }
+        .close-button {
+            color: #9ca3af; float: right; font-size: 1.75rem; font-weight: bold;
+        }
+        .close-button:hover, .close-button:focus {
+            color: #d1d5db; text-decoration: none; cursor: pointer;
+        }
+        hr.custom-hr {
+            border-color: #374151; /* Cor da borda do card */
+            margin-top: 1.5rem; /* 24px */
+            margin-bottom: 1.5rem; /* 24px */
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6">
+
+    <div id="welcomeScreen" class="text-center max-w-xl w-full results-card">
+        <h1 class="text-4xl font-bold mb-4 text-emerald-400">Descubra Seu Arquétipo Gamer</h1>
+        <p class="mb-6 text-lg text-gray-300">Revele sua persona gamer! Responda algumas perguntas sobre você e suas preferências para receber recomendações personalizadas de gêneros de jogos.</p>
+        
+        <div class="space-y-4 mb-6 max-w-md mx-auto">
+            <div>
+                <label for="nickname" class="block text-sm font-medium text-gray-400">Apelido (Opcional)</label>
+                <input type="text" id="nickname" name="nickname" class="mt-1">
+            </div>
+            <div>
+                <label for="age" class="block text-sm font-medium text-gray-400">Idade</label>
+                <input type="number" id="age" name="age" min="13" max="120" class="mt-1">
+            </div>
+            <div>
+                <label for="gender" class="block text-sm font-medium text-gray-400">Gênero</label>
+                <select id="gender" name="gender" class="mt-1">
+                    <option value="">Prefiro não dizer</option>
+                    <option value="male">Masculino</option>
+                    <option value="female">Feminino</option>
+                    <option value="non-binary">Não-binário</option>
+                    <option value="other">Outro</option>
+                </select>
+            </div>
+            <div>
+                <label for="education" class="block text-sm font-medium text-gray-400">Nível de Escolaridade Mais Alto (Opcional)</label>
+                <select id="education" name="education" class="mt-1">
+                    <option value="">Prefiro não dizer</option>
+                    <option value="high-school">Ensino Médio ou equivalente</option>
+                    <option value="some-college">Superior Incompleto / Técnico</option>
+                    <option value="bachelors">Graduação (Bacharelado)</option>
+                    <option value="masters">Mestrado</option>
+                    <option value="doctorate">Doutorado (PhD, MD, etc.)</option>
+                    <option value="other">Outro</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="mb-8">
+            <p class="text-lg mb-3 text-gray-300">Você se considera um(a) gamer?</p>
+            <div class="flex justify-center space-x-4">
+                <button id="isGamerYes" class="btn btn-primary px-8 py-3 text-base">Sim, sou!</button>
+                <button id="isGamerNo" class="btn btn-primary px-8 py-3 text-base">Na verdade não</button>
+            </div>
+        </div>
+        <p class="text-sm text-gray-500">Isso nos ajuda a personalizar a experiência para você.</p>
+    </div>
+
+    <div id="introCardPersonality" class="hidden text-center max-w-xl w-full results-card">
+        <h2 class="text-3xl font-bold mb-4 text-emerald-400">Sobre Você</h2>
+        <p class="mb-8 text-lg text-gray-300">Primeiro, algumas perguntas rápidas sobre seus traços gerais de personalidade. Seja honesto(a)!</p>
+        <button id="startPersonalityButton" class="btn btn-primary px-8 py-3 text-base">Continuar</button>
+    </div>
+
+    <div id="introCardMotivation" class="hidden text-center max-w-xl w-full results-card">
+        <h2 id="introCardMotivationTitle" class="text-3xl font-bold mb-4 text-emerald-400">Título Motivação</h2>
+        <p id="introCardMotivationText" class="mb-8 text-lg text-gray-300">Texto Motivação.</p>
+        <button id="startMotivationButton" class="btn btn-primary px-8 py-3 text-base">Continuar</button>
+    </div>
+
+    <div id="questionnaireScreen" class="hidden w-full max-w-2xl">
+        <h2 id="moduleTitle" class="text-3xl font-semibold mb-6 text-center text-emerald-400">Percepções Sobre Personalidade</h2>
+        <div class="progress-bar-container">
+            <div id="progressBar" class="progress-bar"></div>
+        </div>
+        <div id="questionContainer" class="card">
+            </div>
+        <div class="flex justify-between mt-6">
+            <button id="prevButton" class="btn btn-neutral">Anterior</button>
+            <button id="nextButton" class="btn btn-primary">Próxima</button>
+        </div>
+    </div>
+
+    <div id="resultsScreen" class="hidden max-w-3xl w-full results-card">
+        <h2 class="text-3xl font-bold mb-2 text-emerald-400">Seu Perfil Gamer<span id="resultNickname" class="text-emerald-400"></span>!</h2>
+        
+        <div id="archetypeResultSection" class="my-6 text-left p-6 bg-gray-800 rounded-lg border border-gray-700 shadow-lg">
+            <h3 class="text-2xl font-semibold mb-3 text-amber-400 text-center">Seu Arquétipo Gamer: <span id="mainArchetypeName"></span></h3>
+            <div class="flex flex-col md:flex-row items-center md:items-start gap-4">
+                <img id="characterImage" src="https://placehold.co/180x180/1f2937/d1d5db?text=Arquétipo" alt="Arquétipo do Personagem" class="character-image md:w-1/3">
+                <div class="md:w-2/3">
+                    <h4 class="text-xl font-medium text-sky-300 mb-1">Ênfase: <span id="subTypeName"></span></h4>
+                    <p id="archetypeDescriptionText" class="text-gray-300 text-sm"></p>
+                </div>
+            </div>
+        </div>
+        
+        <h3 class="text-2xl font-semibold mt-8 mb-4 text-sky-400">Principais Gêneros Recomendados:</h3>
+        <div id="genreRecommendations" class="space-y-4 mb-8 text-left max-w-xl mx-auto">
+            </div>
+
+        <h3 class="text-2xl font-semibold mb-4 text-sky-400">Radar de Afinidade com Gêneros:</h3>
+        <div class="w-full max-w-md mx-auto h-72 md:h-96"> 
+            <canvas id="resultsChart"></canvas>
+        </div>
+        
+        <hr class="custom-hr">
+
+        <div id="resultsDisclaimerSection" class="text-sm text-gray-400 text-left space-y-3 px-2">
+            <h4 class="text-lg font-semibold text-sky-400 mb-2">Sobre Seus Resultados e Próximos Passos:</h4>
+            <p>Parabéns por completar o questionário! Seu arquétipo gamer, <strong class="text-emerald-300" id="archetypeResultNameForDisclaimer">O Explorador</strong> com ênfase em <strong class="text-sky-300" id="subTypeResultNameForDisclaimer">O Cronista</strong>, sugere que você tende a apreciar experiências de jogo que valorizam <span id="archetypeKeyTraitsAndMotivations">a exploração de narrativas ricas e a descoberta de novos mundos</span>.</p>
+            <p>Os gêneros que recomendamos foram selecionados com base nessa análise.</p>
+            
+            <h5 class="font-semibold text-gray-300 mt-3">🎮 Experimente e Explore!</h5>
+            <p>Encorajamos você a experimentar os jogos e gêneros sugeridos, mas lembre-se que o mais importante é se divertir! O universo gamer é vasto e cheio de surpresas que podem te encantar, então não deixe de explorar outros tipos de jogos também. Sua jornada é única!</p>
+            
+            <h5 class="font-semibold text-gray-300 mt-3">💡 Quer Saber Mais?</h5>
+            <p>Este questionário foi inspirado em pesquisas sobre personalidade e motivações para jogar. Se você tiver interesse em se aprofundar nos estudos que embasaram este projeto, especialmente sobre as 12 motivações para jogar, visite o site da <a href="https://quanticfoundry.com/" target="_blank" rel="noopener noreferrer" class="text-emerald-400 hover:text-emerald-300 underline">Quantic Foundry</a>, cofundada pelo Dr. Nick Yee.</p>
+            
+            <h5 class="font-semibold text-red-400 mt-3">⚠️ Aviso Importante:</h5>
+            <p>Este questionário é uma ferramenta de exploração e entretenimento, criada com base em modelos teóricos. Ele <strong>não</strong> é um teste psicológico com validação científica formal e seus resultados não devem ser considerados como um diagnóstico ou avaliação psicológica definitiva. Os arquétipos e sugestões são oferecidos como um ponto de partida divertido para sua jornada no mundo dos jogos. Divirta-se com responsabilidade!</p>
+        </div>
+        
+        <hr class="custom-hr">
+
+        <button id="restartButton" class="btn btn-primary mt-8">Refazer o Questionário</button>
+    </div>
+
+    <div id="attentionCheckModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeModal('attentionCheckModal')">&times;</span>
+            <h3 class="text-2xl font-semibold mb-4 text-yellow-400">Verificação de Atenção!</h3>
+            <p id="attentionCheckText" class="mb-4 text-gray-300">Por favor, leia com atenção.</p>
+            <div id="attentionCheckOptionsContainer" class="text-center py-2">
+                </div>
+            <button id="submitAttentionCheck" class="btn btn-primary mt-4 w-full">Enviar</button>
+        </div>
+    </div>
+
+<script>
+// --- CONFIGURATION & DATA ---
+const ALL_QUESTIONS = {
+    personality: [
+        // N: Neuroticismo
+        { id: 'N1_1', text: "Eu me preocupo com as coisas.", facet: 'N1_Anxiety', key: '+' },
+        { id: 'N1_2', text: "Eu me estresso facilmente.", facet: 'N1_Anxiety', key: '+' },
+        // E: Extroversão
+        { id: 'E1_1', text: "Faço amigos facilmente.", facet: 'E1_Friendliness', key: '+' },
+        { id: 'E1_2', text: "Mantenho os outros à distância.", facet: 'E1_Friendliness', key: '-' },
+        // O: Abertura à Experiência
+        { id: 'O1_1', text: "Tenho uma imaginação vívida.", facet: 'O1_Imagination', key: '+' },
+        { id: 'O1_2', text: "Adoro sonhar acordado(a).", facet: 'O1_Imagination', key: '+' },
+        // A: Amabilidade
+        { id: 'A1_1', text: "Confio nos outros.", facet: 'A1_Trust', key: '+' },
+        { id: 'A1_2', text: "Desconfio das pessoas.", facet: 'A1_Trust', key: '-' },
+        // C: Conscienciosidade
+        { id: 'C1_1', text: "Completo tarefas com sucesso.", facet: 'C1_SelfEfficacy', key: '+' },
+        { id: 'C1_2', text: "Sou excelente no que faço.", facet: 'C1_SelfEfficacy', key: '+' },
+    ], 
+    motivation_gamer: [
+        { id: 'M_Dest_G1', text: "Gosto de jogos onde posso causar muita destruição.", motivation: 'Destruction' },
+        { id: 'M_Exci_G1', text: "Sou atraído(a) por jogos rápidos e cheios de momentos emocionantes.", motivation: 'Excitement' },
+        { id: 'M_Comp_G1', text: "Gosto de jogos onde posso competir contra outras pessoas.", motivation: 'Competition' },
+        { id: 'M_Comm_G1', text: "Gosto de jogos que me permitem fazer parte de uma equipe e interagir.", motivation: 'Community' },
+        { id: 'M_Chal_G1', text: "Sou motivado(a) por jogos que são muito desafiadores.", motivation: 'Challenge' },
+        { id: 'M_Stra_G1', text: "Prefiro jogos que exigem pensamento estratégico cuidadoso.", motivation: 'Strategy' },
+        { id: 'M_Compl_G1', text: "Para mim, é importante completar tudo que um jogo oferece.", motivation: 'Completion' },
+        { id: 'M_Pow_G1', text: "Gosto de jogos onde posso tornar meu personagem muito poderoso.", motivation: 'Power' },
+        { id: 'M_Fant_G1', text: "Adoro jogos que me permitem escapar para um mundo diferente.", motivation: 'Fantasy' },
+        { id: 'M_Story_G1', text: "Uma história envolvente é muito importante para meu divertimento.", motivation: 'Story' },
+        { id: 'M_Desi_G1', text: "Gosto de jogos que me permitem personalizar meu personagem ou criar coisas.", motivation: 'Design' },
+        { id: 'M_Disc_G1', text: "Sou motivado(a) por jogos com mundos grandes para explorar.", motivation: 'Discovery' },
+    ], 
+    motivation_nongamer: [
+        { id: 'M_Dest_NG1', text: "No entretenimento, a ideia de criar um caos inofensivo parece divertida.", motivation: 'Destruction' },
+        { id: 'M_Exci_NG1', text: "Prefiro filmes ou atividades cheias de ação e que me deixam na ponta da cadeira.", motivation: 'Excitement' },
+        { id: 'M_Comp_NG1', text: "Em atividades em grupo, gosto do aspecto competitivo de tentar superar os outros.", motivation: 'Competition' },
+        { id: 'M_Comm_NG1', text: "Prefiro atividades de lazer onde posso colaborar e socializar com outros.", motivation: 'Community' },
+        { id: 'M_Chal_NG1', text: "Sou atraído(a) por hobbies difíceis de aprender, mas que oferecem grande satisfação.", motivation: 'Challenge' },
+        { id: 'M_Stra_NG1', text: "Diante de um problema complexo, gosto de pensar em diferentes estratégias.", motivation: 'Strategy' },
+        { id: 'M_Compl_NG1', text: "Quando começo um projeto ou coleção, sinto um forte impulso para concluí-lo 100%.", motivation: 'Completion' },
+        { id: 'M_Pow_NG1', text: "Num cenário hipotético, eu me sentiria motivado(a) a me tornar o mais capaz possível.", motivation: 'Power' },
+        { id: 'M_Fant_NG1', text: "Gosto de livros ou filmes que me transportam para um mundo fictício detalhado.", motivation: 'Fantasy' },
+        { id: 'M_Story_NG1', text: "Sou mais engajado(a) por entretenimento com uma história profunda e bem desenvolvida.", motivation: 'Story' },
+        { id: 'M_Desi_NG1', text: "Gosto de atividades onde posso expressar minha criatividade (desenhar, decorar).", motivation: 'Design' },
+        { id: 'M_Disc_NG1', text: "Sou curioso(a) e gosto de explorar novos lugares, ideias ou detalhes escondidos.", motivation: 'Discovery' },
+    ], 
+    attentionChecks: [
+        { 
+            id: 'ACQ1', 
+            text: "Para mostrar que você está lendo com atenção, por favor, selecione a opção que diz 'Tem a ver comigo'.", 
+            correctAnswer: 4, 
+            options: ["Nada a ver comigo", "Pouco a ver comigo", "Mais ou menos", "Tem a ver comigo", "Tudo a ver comigo"],
+            type: 'attention' 
+        }
+    ]
+};
+
+const LIKERT_OPTIONS_PT = ["Nada a ver comigo", "Pouco a ver comigo", "Mais ou menos", "Tem a ver comigo", "Tudo a ver comigo"];
+
+const PERSONALITY_DOMAINS = {
+    N_Neuroticism: ['N1_Anxiety', 'N2_Anger', 'N3_Depression', 'N4_SelfConsciousness', 'N5_Immoderation', 'N6_Vulnerability'],
+    E_Extraversion: ['E1_Friendliness', 'E2_Gregariousness', 'E3_Assertiveness', 'E4_ActivityLevel', 'E5_ExcitementSeeking', 'E6_Cheerfulness'],
+    O_Openness: ['O1_Imagination', 'O2_ArtisticInterests', 'O3_Emotionality', 'O4_Adventurousness', 'O5_Intellect', 'O6_Liberalism'],
+    A_Agreeableness: ['A1_Trust', 'A2_Morality', 'A3_Altruism', 'A4_Cooperation', 'A5_Modesty', 'A6_Sympathy'],
+    C_Conscientiousness: ['C1_SelfEfficacy', 'C2_Orderliness', 'C3_Dutifulness', 'C4_AchievementStriving', 'C5_SelfDiscipline', 'C6_Cautiousness']
+};
+const PERSONALITY_DOMAIN_DISPLAY_NAMES_PT = {
+    N_Neuroticism: "Neuroticismo", E_Extraversion: "Extroversão", O_Openness: "Abertura", 
+    A_Agreeableness: "Amabilidade", C_Conscientiousness: "Conscienciosidade"
+};
+
+const MOTIVATIONS_LIST = [
+    'Destruction', 'Excitement', 'Competition', 'Community', 'Challenge', 'Strategy', 
+    'Completion', 'Power', 'Fantasy', 'Story', 'Design', 'Discovery'
+];
+const MOTIVATION_DISPLAY_NAMES_PT = {
+    Destruction: "Destruição", Excitement: "Empolgação", Competition: "Competição", Community: "Comunidade",
+    Challenge: "Desafio", Strategy: "Estratégia", Completion: "Conclusão", Power: "Poder",
+    Fantasy: "Fantasia", Story: "História", Design: "Criação", Discovery: "Descoberta"
+};
+
+const ARCHETYPE_DATA_PT = {
+    "O Explorador": {
+        displayName: "O Explorador",
+        image: "https://placehold.co/180x180/22c55e/ffffff?text=Explorador&font=Inter",
+        subtypes: {
+            "O Explorador": { 
+                displayName: "O Explorador",
+                description: "Sua alma anseia por desbravar o desconhecido, mapear territórios virgens e sentir a emoção da descoberta pura. Cada novo horizonte é um convite irrecusável.",
+                keyMotivations: ['Discovery'], keyFacets: ['O4_Adventurousness', 'O5_Intellect'] 
+            },
+            "O Cronista": { 
+                displayName: "O Cronista",
+                description: "Você se perde em narrativas ricas e mundos fantásticos, valorizando cada detalhe da história e a profundidade dos personagens. Para você, cada jogo é um livro interativo.",
+                keyMotivations: ['Story', 'Fantasy'], keyFacets: ['O1_Imagination', 'O3_Emotionality']
+            }
+        },
+        primaryPersonalityDomain: "O_Openness", // For simplified main archetype determination
+        primaryMotivations: ["Discovery", "Story", "Fantasy"] // For simplified main archetype determination
+    },
+    "O Estrategista": {
+        displayName: "O Estrategista",
+        image: "https://placehold.co/180x180/3b82f6/ffffff?text=Estrategista&font=Inter",
+        subtypes: {
+            "O Estrategista": { 
+                displayName: "O Estrategista",
+                description: "Sua mente é um campo de batalha onde táticas são forjadas e planos são meticulosamente traçados. A vitória é fruto da inteligência e da antecipação.",
+                keyMotivations: ['Strategy'], keyFacets: ['O5_Intellect', 'C6_Cautiousness']
+            },
+            "O Conquistador": { 
+                displayName: "O Conquistador", 
+                description: "Você vê cada desafio como uma montanha a ser escalada com astúcia e persistência. A superação e a conquista de objetivos difíceis através da estratégia são sua maior recompensa.",
+                keyMotivations: ['Challenge', 'Power'], keyFacets: ['C1_SelfEfficacy', 'C4_AchievementStriving']
+            }
+        },
+        primaryPersonalityDomain: "C_Conscientiousness", 
+        primaryMotivations: ["Strategy", "Challenge"]
+    },
+    "O Competidor": {
+        displayName: "O Competidor",
+        image: "https://placehold.co/180x180/ef4444/ffffff?text=Competidor&font=Inter",
+        subtypes: {
+            "O Competidor": { 
+                displayName: "O Competidor",
+                description: "O sabor da vitória é o que te move. Superar adversários, subir nos rankings e provar sua superioridade na arena da competição é sua maior emoção.",
+                keyMotivations: ['Competition'], keyFacets: ['E3_Assertiveness']
+            },
+            "O Intrépido": { 
+                displayName: "O Intrépido",
+                description: "Você busca a adrenalina da ação veloz e dos momentos de tirar o fôlego. A intensidade e a emoção crua do combate ou da disputa são sua paixão.",
+                keyMotivations: ['Excitement'], keyFacets: ['E5_ExcitementSeeking', 'E4_ActivityLevel']
+            }
+        },
+        primaryPersonalityDomain: "E_Extraversion",
+        primaryMotivations: ["Competition", "Excitement"]
+    },
+    "O Colecionador": {
+        displayName: "O Colecionador",
+        image: "https://placehold.co/180x180/8b5cf6/ffffff?text=Colecionador&font=Inter",
+        subtypes: {
+            "O Colecionador": { 
+                displayName: "O Colecionador",
+                description: "Nada te satisfaz mais do que completar cada lista, encontrar cada item e organizar suas conquistas. O 100% é seu objetivo e sua arte.",
+                keyMotivations: ['Completion'], keyFacets: ['C2_Orderliness', 'C3_Dutifulness']
+            },
+            "O Otimizador": { 
+                displayName: "O Otimizador",
+                description: "Você busca constantemente aprimorar, maximizar e encontrar a combinação perfeita para atingir o ápice do poder e da eficiência em seus jogos.",
+                keyMotivations: ['Power'], keyFacets: ['C1_SelfEfficacy', 'C4_AchievementStriving']
+            }
+        },
+        primaryPersonalityDomain: "C_Conscientiousness",
+        primaryMotivations: ["Completion", "Power"]
+    },
+    "O Artista": {
+        displayName: "O Artista",
+        image: "https://placehold.co/180x180/eab308/ffffff?text=Artista&font=Inter",
+        subtypes: {
+            "O Artista": { 
+                displayName: "O Artista",
+                description: "Sua imaginação não tem limites! Você adora expressar sua criatividade personalizando, construindo e dando forma a mundos e personagens únicos.",
+                keyMotivations: ['Design'], keyFacets: ['O1_Imagination', 'O2_ArtisticInterests']
+            },
+            "O Anfitrião": { 
+                displayName: "O Anfitrião",
+                description: "Você usa sua criatividade para conectar pessoas e construir experiências memoráveis em comunidade. Para você, a diversão é maior quando compartilhada e co-criada.",
+                keyMotivations: ['Community', 'Design'], keyFacets: ['E1_Friendliness', 'A3_Altruism']
+            }
+        },
+        primaryPersonalityDomain: "O_Openness", // Could also be E_Extraversion or A_Agreeableness
+        primaryMotivations: ["Design", "Community"]
+    }
+};
+
+
+const GENRES = [
+    { name: "Ação", description: "Enfatiza desafios físicos, combate e sequências de ritmo acelerado." },
+    { name: "Tiro (Shooter)", description: "Foca em combate usando armas de longo alcance." },
+    { name: "Ação-Aventura", description: "Combina ação com exploração, quebra-cabeças e narrativa." },
+    { name: "Aventura", description: "Prioriza quebra-cabeças, exploração e narrativa." },
+    { name: "RPG", description: "Jogadores assumem papéis, envolvendo desenvolvimento e missões." },
+    { name: "Estratégia", description: "Requer planejamento, decisões táticas e gerenciamento de recursos." },
+    { name: "Simulação", description: "Replica atividades do mundo real ou fictícias." },
+    { name: "Esportes", description: "Simula a prática de esportes físicos tradicionais." },
+    { name: "Corrida", description: "Jogadores competem em corridas, tipicamente com veículos." },
+    { name: "Luta", description: "Combate corpo a corpo entre personagens, enfatizando combos." },
+    { name: "Quebra-Cabeça (Puzzle)", description: "Testa habilidades de resolução de problemas." },
+    { name: "Ritmo (Musical)", description: "Desafia jogadores a corresponder batidas ou ritmos musicais." }, 
+    { name: "Plataforma", description: "Jogadores pulam e escalam entre plataformas." }, 
+    { name: "Mundo Aberto (Sandbox)", description: "Fornece alta liberdade para explorar e interagir." }, 
+    { name: "Sobrevivência", description: "Jogadores coletam recursos e criam itens para sobreviver." },
+    { name: "Battle Royale", description: "Muitos jogadores lutam para ser o último sobrevivente." },
+    { name: "Terror (Horror)", description: "Projetado para evocar medo, pavor e suspense." },
+    { name: "MMO", description: "Jogos online com grande número de jogadores em mundo persistente." } 
+];
+
+const GAME_EXAMPLES = {
+    "RPG": { classic: "Chrono Trigger, Baldur's Gate", modern: "The Witcher 3, Elden Ring" },
+    "Ação": { classic: "Contra, Streets of Rage", modern: "Devil May Cry 5, Hades" },
+    "Estratégia": { classic: "StarCraft, Civilization II", modern: "XCOM 2, Crusader Kings III" },
+    "Tiro (Shooter)": { classic: "DOOM (1993), GoldenEye 007", modern: "DOOM Eternal, Apex Legends" },
+    "Aventura": { classic: "Monkey Island, Myst", modern: "Life is Strange, Outer Wilds" },
+    "Mundo Aberto (Sandbox)": { classic: "GTA III, Ultima Online", modern: "Minecraft, Red Dead Redemption 2" },
+    "MMO": { classic: "Ultima Online, EverQuest", modern: "World of Warcraft, Final Fantasy XIV" },
+    "Quebra-Cabeça (Puzzle)": { classic: "Tetris, Lemmings", modern: "Portal 2, The Witness" },
+    "Simulação": { classic: "SimCity 2000, Theme Hospital", modern: "Stardew Valley, Microsoft Flight Simulator" },
+};
+
+// --- STATE VARIABLES ---
+let currentQuizPhase = 'welcome'; 
+let currentQuestionIndex = 0;
+let userAnswers = {}; 
+let isGamer = null;
+let nickname = "";
+let userAge = null; 
+let userGender = ""; 
+let userEducation = ""; 
+let questionnaireOrder = []; 
+let attentionCheckFailures = 0;
+const MAX_ATTENTION_CHECK_FAILURES = 1; 
+
+// --- DOM ELEMENTS ---
+const welcomeScreen = document.getElementById('welcomeScreen');
+const introCardPersonality = document.getElementById('introCardPersonality');
+const introCardMotivation = document.getElementById('introCardMotivation');
+const questionnaireScreen = document.getElementById('questionnaireScreen');
+const resultsScreen = document.getElementById('resultsScreen');
+const questionContainer = document.getElementById('questionContainer');
+const nextButton = document.getElementById('nextButton');
+const prevButton = document.getElementById('prevButton');
+const moduleTitle = document.getElementById('moduleTitle');
+const progressBar = document.getElementById('progressBar');
+const resultNickname = document.getElementById('resultNickname');
+const mainArchetypeNameEl = document.getElementById('mainArchetypeName');
+const subTypeNameEl = document.getElementById('subTypeName');
+const archetypeDescriptionTextEl = document.getElementById('archetypeDescriptionText');
+const characterImageEl = document.getElementById('characterImage');
+const archetypeResultNameForDisclaimerEl = document.getElementById('archetypeResultNameForDisclaimer');
+const subTypeResultNameForDisclaimerEl = document.getElementById('subTypeResultNameForDisclaimer');
+const archetypeKeyTraitsAndMotivationsEl = document.getElementById('archetypeKeyTraitsAndMotivations');
+
+
+// --- HELPER FUNCTIONS ---
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+function hideAllScreens() {
+    welcomeScreen.classList.add('hidden');
+    introCardPersonality.classList.add('hidden');
+    introCardMotivation.classList.add('hidden');
+    questionnaireScreen.classList.add('hidden');
+    resultsScreen.classList.add('hidden');
+}
+
+// --- INITIALIZATION & EVENT LISTENERS ---
+document.getElementById('isGamerYes').addEventListener('click', () => validateAndProceedToPersonalityIntro(true));
+document.getElementById('isGamerNo').addEventListener('click', () => validateAndProceedToPersonalityIntro(false));
+
+document.getElementById('startPersonalityButton').addEventListener('click', startPersonalityQuestions);
+document.getElementById('startMotivationButton').addEventListener('click', startMotivationQuestions);
+
+nextButton.addEventListener('click', handleNextButton); 
+prevButton.addEventListener('click', handlePrevious);
+document.getElementById('restartButton').addEventListener('click', () => {
+    currentQuizPhase = 'welcome'; currentQuestionIndex = 0; userAnswers = {};
+    isGamer = null; nickname = ""; userAge = null; userGender = ""; userEducation = "";
+    questionnaireOrder = []; attentionCheckFailures = 0;
+    if (window.resultsChartInstance) window.resultsChartInstance.destroy();
+    
+    hideAllScreens();
+    welcomeScreen.classList.remove('hidden');
+    document.getElementById('nickname').value = '';
+    document.getElementById('age').value = '';
+    document.getElementById('gender').value = '';
+    document.getElementById('education').value = '';
+});
+
+function validateAndProceedToPersonalityIntro(gamerStatus) {
+    nickname = document.getElementById('nickname').value.trim();
+    const ageInput = document.getElementById('age').value;
+    
+    if (!ageInput) {
+        alert("Por favor, insira sua idade para continuar.");
+        return;
+    }
+    userAge = parseInt(ageInput);
+    if (isNaN(userAge) || userAge < 13 || userAge > 120) {
+        alert("Por favor, insira uma idade válida (entre 13 e 120).");
+        return;
+    }
+
+    userGender = document.getElementById('gender').value;
+    userEducation = document.getElementById('education').value;
+    isGamer = gamerStatus;
+
+    let personalityQuestions = shuffleArray([...ALL_QUESTIONS.personality]);
+    if (ALL_QUESTIONS.attentionChecks.length > 0) {
+        const acqInsertPosition = Math.floor(personalityQuestions.length / 3) + Math.floor(Math.random() * 3);
+        personalityQuestions.splice(Math.min(acqInsertPosition, personalityQuestions.length), 0, ALL_QUESTIONS.attentionChecks[0]);
+    }
+    let motivationQuestions = isGamer ? 
+        shuffleArray([...ALL_QUESTIONS.motivation_gamer]) : 
+        shuffleArray([...ALL_QUESTIONS.motivation_nongamer]);
+    
+    questionnaireOrder = [
+        ...personalityQuestions.map(q => ({...q, module: 'personality'})),
+        ...motivationQuestions.map(q => ({...q, module: 'motivation'}))
+    ];
+    
+    currentQuestionIndex = 0; 
+    userAnswers = {}; 
+    attentionCheckFailures = 0; 
+
+    currentQuizPhase = 'intro_personality';
+    hideAllScreens();
+    introCardPersonality.classList.remove('hidden');
+}
+
+function startPersonalityQuestions() {
+    currentQuizPhase = 'personality_questions';
+    hideAllScreens();
+    questionnaireScreen.classList.remove('hidden');
+    moduleTitle.textContent = 'Sobre Você'; 
+    displayQuestion(); 
+}
+
+function showIntroCardMotivation() {
+    currentQuizPhase = 'intro_motivation';
+    hideAllScreens();
+    const titleEl = document.getElementById('introCardMotivationTitle');
+    const textEl = document.getElementById('introCardMotivationText');
+    if (isGamer) {
+        titleEl.textContent = "O Que Te Anima nos Jogos?";
+        textEl.textContent = "Agora, sobre o que te diverte e motiva em jogos. Pense nas suas experiências favoritas!";
+    } else {
+        titleEl.textContent = "Suas Preferências de Lazer";
+        textEl.textContent = "Agora, sobre seus gostos em atividades de lazer e entretenimento em geral.";
+    }
+    introCardMotivation.classList.remove('hidden');
+}
+
+function startMotivationQuestions() {
+    currentQuizPhase = 'motivation_questions';
+    hideAllScreens();
+    questionnaireScreen.classList.remove('hidden');
+    moduleTitle.textContent = isGamer ? 'O Que Te Anima nos Jogos?' : 'Suas Preferências de Lazer'; 
+    displayQuestion(); 
+}
+
+function displayQuestion() {
+    if (currentQuestionIndex >= questionnaireOrder.length) {
+        finishQuiz();
+        return;
+    }
+
+    const questionData = questionnaireOrder[currentQuestionIndex];
+
+    if (questionData.module === 'motivation' && currentQuizPhase === 'personality_questions') {
+        showIntroCardMotivation();
+        return; 
+    }
+    
+    if (questionnaireScreen.classList.contains('hidden') && 
+        (currentQuizPhase === 'personality_questions' || currentQuizPhase === 'motivation_questions')) {
+        hideAllScreens();
+        questionnaireScreen.classList.remove('hidden');
+    }
+    
+    if (questionData.type === 'attention') {
+        showAttentionCheckModal(questionData);
+        return; 
+    }
+    
+    let questionNumberInModule = 0;
+    if (questionData.module === 'personality') {
+        questionNumberInModule = questionnaireOrder.slice(0, currentQuestionIndex + 1)
+                                   .filter(q => q.module === 'personality' && q.type !== 'attention').length;
+        moduleTitle.textContent = 'Sobre Você';
+    } else if (questionData.module === 'motivation') {
+        questionNumberInModule = questionnaireOrder.slice(0, currentQuestionIndex + 1)
+                                   .filter(q => q.module === 'motivation' && q.type !== 'attention').length;
+        moduleTitle.textContent = isGamer ? 'O Que Te Anima nos Jogos?' : 'Suas Preferências de Lazer';
+    }
+
+    let optionsHtml = '';
+    const options = LIKERT_OPTIONS_PT; 
+    options.forEach((optText, i) => {
+        const value = i + 1;
+        const isChecked = userAnswers[questionData.id] === value ? 'checked' : '';
+        optionsHtml += `
+            <div class="radio-option">
+                <input type="radio" id="option${value}_${questionData.id}" name="answer_${questionData.id}" value="${value}" ${isChecked} onchange="answerSelected('${questionData.id}', this.value)">
+                <label for="option${value}_${questionData.id}">${optText}</label>
+            </div>
+        `;
+    });
+
+    questionContainer.innerHTML = `
+        <p class="text-xl mb-6 text-gray-200">${questionNumberInModule}. ${questionData.text}</p> 
+        <div class="flex flex-wrap justify-center gap-2">
+            ${optionsHtml}
+        </div>
+    `;
+
+    prevButton.disabled = currentQuestionIndex === 0;
+    prevButton.classList.toggle('opacity-50', currentQuestionIndex === 0);
+    prevButton.classList.toggle('cursor-not-allowed', currentQuestionIndex === 0);
+    updateProgressBar();
+}
+
+function answerSelected(questionId, value) {
+    userAnswers[questionId] = parseInt(value);
+    if (questionnaireOrder[currentQuestionIndex] && questionnaireOrder[currentQuestionIndex].id === questionId) {
+        setTimeout(() => {
+            const currentQuestionData = questionnaireOrder[currentQuestionIndex]; 
+            if (currentQuestionData && currentQuestionData.id === questionId && currentQuestionData.type !== 'attention') {
+                 proceedToNextQuestion();
+            }
+        }, 350); 
+    }
+}
+
+function proceedToNextQuestion() {
+    currentQuestionIndex++;
+    displayQuestion();
+}
+
+
+function showAttentionCheckModal(acqData) {
+    const modal = document.getElementById('attentionCheckModal');
+    const textElement = document.getElementById('attentionCheckText');
+    const optionsContainer = document.getElementById('attentionCheckOptionsContainer');
+    const submitButton = document.getElementById('submitAttentionCheck');
+
+    textElement.textContent = acqData.text;
+    optionsContainer.innerHTML = ''; 
+
+    acqData.options.forEach((optText, index) => { 
+        const value = index + 1;
+        optionsContainer.innerHTML += `
+            <div class="radio-option">
+                <input type="radio" id="acq_option${value}" name="acq_answer" value="${value}">
+                <label for="acq_option${value}">${optText}</label>
+            </div>
+        `;
+    });
+    
+    submitButton.onclick = () => {
+        const selectedAcqOption = document.querySelector('input[name="acq_answer"]:checked');
+        if (selectedAcqOption) {
+            const selectedValue = parseInt(selectedAcqOption.value);
+            if (selectedValue !== acqData.correctAnswer) {
+                attentionCheckFailures++;
+                if (attentionCheckFailures > MAX_ATTENTION_CHECK_FAILURES) { 
+                    alert("Parece que você não está prestando muita atenção. O questionário será encerrado. Por favor, tente novamente mais tarde, quando puder se concentrar.");
+                    location.reload(); 
+                    return;
+                } else {
+                    alert("Verificação de atenção falhou. Por favor, certifique-se de ler as perguntas com atenção. Você tem mais " + (MAX_ATTENTION_CHECK_FAILURES - attentionCheckFailures + 1) + " chance(s).");
+                }
+            }
+            closeModal('attentionCheckModal');
+            userAnswers[acqData.id] = selectedValue; 
+            currentQuestionIndex++; 
+            displayQuestion(); 
+        } else {
+            alert("Por favor, selecione uma resposta para a verificação de atenção.");
+        }
+    };
+    modal.style.display = "block";
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = "none";
+}
+
+function handleNextButton() { 
+    const currentQuestionData = questionnaireOrder[currentQuestionIndex];
+    if (!currentQuestionData || currentQuestionData.type === 'attention') return;
+
+    if (!userAnswers[currentQuestionData.id]) {
+        const selectedOption = document.querySelector(`input[name="answer_${currentQuestionData.id}"]:checked`);
+        if (selectedOption) {
+            userAnswers[currentQuestionData.id] = parseInt(selectedOption.value);
+        } else {
+            alert("Por favor, selecione uma resposta antes de prosseguir.");
+            return;
+        }
+    }
+    proceedToNextQuestion();
+}
+
+function handlePrevious() {
+    if (currentQuestionIndex > 0) {
+        currentQuestionIndex--;
+        while (currentQuestionIndex > 0 && questionnaireOrder[currentQuestionIndex].type === 'attention') {
+            currentQuestionIndex--;
+        }
+        
+        const prevQuestionData = questionnaireOrder[currentQuestionIndex];
+        if (prevQuestionData.module === 'personality' && 
+            (currentQuizPhase === 'intro_motivation' || currentQuizPhase === 'motivation_questions')) {
+            currentQuizPhase = 'personality_questions'; 
+        } else if (prevQuestionData.module === 'motivation' && currentQuizPhase === 'results') {
+             currentQuizPhase = 'motivation_questions';
+        }
+        if (currentQuestionIndex === 0 && questionnaireOrder[0].module === 'personality' && currentQuizPhase === 'personality_questions') {
+             currentQuizPhase = 'intro_personality';
+             hideAllScreens();
+             introCardPersonality.classList.remove('hidden');
+             return; 
+        }
+        displayQuestion();
+    }
+}
+
+function updateProgressBar() {
+    const nonAcqQuestions = questionnaireOrder.filter(q => q.type !== 'attention');
+    const totalNonAcqQuestions = nonAcqQuestions.length;
+    
+    let answeredNonAcqCount = 0;
+    for(let i = 0; i < currentQuestionIndex; i++) { 
+        const qData = questionnaireOrder[i];
+        if(qData.type !== 'attention' && userAnswers[qData.id] !== undefined){
+            answeredNonAcqCount++;
+        }
+    }
+        
+    const progress = totalNonAcqQuestions > 0 ? (answeredNonAcqCount / totalNonAcqQuestions) * 100 : 0;
+    
+    progressBar.style.width = `${progress}%`;
+}
+
+
+function finishQuiz() {
+    currentQuizPhase = 'results';
+    hideAllScreens();
+    resultsScreen.classList.remove('hidden');
+
+    if (nickname) {
+        resultNickname.textContent = ` para ${nickname}`;
+    } else {
+        resultNickname.textContent = "";
+    }
+    calculateAndDisplayResults();
+}
+
+function determineArchetypeAndSubtype(personalityScores, motivationScores, facetScores) {
+    let mainArchetypeKey = "O Explorador"; // Default
+    let highestMainScore = -Infinity; // Initialize to a very low number
+
+    // Score each potential main archetype
+    let archetypePotentialScores = {};
+    for (const archKey in ARCHETYPE_DATA_PT) {
+        archetypePotentialScores[archKey] = 0;
+        const archData = ARCHETYPE_DATA_PT[archKey];
+        
+        // Points from primary personality domain
+        if (personalityScores[archData.primaryPersonalityDomain] !== undefined) {
+             archetypePotentialScores[archKey] += (personalityScores[archData.primaryPersonalityDomain] - 3) * 2; // Weight domain score (centered around 3)
+        }
+
+        // Points from primary motivations
+        archData.primaryMotivations.forEach(mot => {
+            if (motivationScores[mot] !== undefined) {
+                archetypePotentialScores[archKey] += (motivationScores[mot] - 3); // Weight motivation score
+            }
+        });
+    }
+
+    for (const archKey in archetypePotentialScores) {
+        if (archetypePotentialScores[archKey] > highestMainScore) {
+            highestMainScore = archetypePotentialScores[archKey];
+            mainArchetypeKey = archKey;
+        }
+    }
+    
+    const mainArchetypeData = ARCHETYPE_DATA_PT[mainArchetypeKey];
+    let determinedSubtypeKey = Object.keys(mainArchetypeData.subtypes)[0]; 
+    let highestSubtypeScore = -Infinity;
+
+    for (const subKey in mainArchetypeData.subtypes) {
+        const subData = mainArchetypeData.subtypes[subKey];
+        let currentSubtypeScore = 0;
+        // Score based on specific motivations for the subtype
+        subData.keyMotivations.forEach(mot => {
+            currentSubtypeScore += (motivationScores[mot] || 3) - 3; // Centered score
+        });
+        // Score based on specific personality facets for the subtype
+        subData.keyFacets.forEach(facetKey => {
+            currentSubtypeScore += (facetScores[facetKey] || 3) -3; // Centered score
+        });
+
+        if (currentSubtypeScore > highestSubtypeScore) {
+            highestSubtypeScore = currentSubtypeScore;
+            determinedSubtypeKey = subKey;
+        }
+    }
+    
+    return {
+        mainArchetype: mainArchetypeData,
+        subType: mainArchetypeData.subtypes[determinedSubtypeKey]
+    };
+}
+
+
+function calculateAndDisplayResults() {
+    // --- 1. Calculate Facet Scores First ---
+    let facetScores = {};
+    ALL_QUESTIONS.personality.forEach(q => {
+        if (!facetScores[q.facet]) {
+            facetScores[q.facet] = { sum: 0, count: 0 };
+        }
+        let answer = userAnswers[q.id] || 3; 
+        if (q.key === '-') answer = 6 - answer;
+        facetScores[q.facet].sum += answer;
+        facetScores[q.facet].count++;
+    });
+
+    for (const facetKey in facetScores) {
+        if (facetScores[facetKey].count > 0) {
+            facetScores[facetKey] = facetScores[facetKey].sum / facetScores[facetKey].count;
+        } else {
+            facetScores[facetKey] = 3; // Default neutral if no items for a facet (should not happen with full Q set)
+        }
+    }
+
+    // --- 2. Calculate Personality Domain Scores from Facet Averages ---
+    let personalityScores = {}; 
+    for (const domain in PERSONALITY_DOMAINS) {
+        let domainSum = 0;
+        let activeFacetsInDomain = 0;
+        PERSONALITY_DOMAINS[domain].forEach(facetName => { 
+            if (facetScores[facetName] !== undefined) {
+                domainSum += facetScores[facetName];
+                activeFacetsInDomain++;
+            }
+        });
+        if (activeFacetsInDomain > 0) {
+             personalityScores[domain] = domainSum / activeFacetsInDomain; 
+        } else {
+            personalityScores[domain] = 3; 
+        }
+    }
+    
+    // --- 3. Calculate Motivation Scores ---
+    let motivationScores = {}; 
+    MOTIVATIONS_LIST.forEach(m => motivationScores[m] = 0);
+    let itemsPerMotivation = {};
+    MOTIVATIONS_LIST.forEach(m => itemsPerMotivation[m] = 0);
+
+    const relevantMotivationQuestions = isGamer ? ALL_QUESTIONS.motivation_gamer : ALL_QUESTIONS.motivation_nongamer;
+    relevantMotivationQuestions.forEach(q => {
+        // Ensure motivation exists in scores, even if not answered (for averaging)
+        if (!itemsPerMotivation.hasOwnProperty(q.motivation)) {
+            itemsPerMotivation[q.motivation] = 0;
+            motivationScores[q.motivation] = 0;
+        }
+        if (userAnswers[q.id] !== undefined) {
+            motivationScores[q.motivation] += userAnswers[q.id];
+            itemsPerMotivation[q.motivation]++;
+        } else { 
+            // If using a subset of questions and some aren't answered,
+            // it's better not to assume neutral unless all questions for that motivation are missing.
+            // For this demo with small subsets, we'll assume neutral if not answered.
+            motivationScores[q.motivation] += 3; 
+            itemsPerMotivation[q.motivation]++;
+        }
+    });
+
+    for (const m in motivationScores) {
+        if (itemsPerMotivation[m] > 0) {
+            motivationScores[m] /= itemsPerMotivation[m]; 
+        } else {
+            motivationScores[m] = 3; 
+        }
+    }
+
+    // --- 4. Determine Archetype & Subtype ---
+    const { mainArchetype, subType } = determineArchetypeAndSubtype(personalityScores, motivationScores, facetScores);
+    
+    mainArchetypeNameEl.textContent = mainArchetype.displayName;
+    subTypeNameEl.textContent = subType.displayName;
+    archetypeDescriptionTextEl.textContent = subType.description;
+    characterImageEl.src = mainArchetype.image; 
+    characterImageEl.alt = `Arquétipo: ${mainArchetype.displayName} - ${subType.displayName}`;
+
+    archetypeResultNameForDisclaimerEl.textContent = mainArchetype.displayName;
+    subTypeResultNameForDisclaimerEl.textContent = subType.displayName;
+    
+    let keyTraitsSummaryList = [];
+    // Find the actual dominant personality domain for the text
+    let dominantPersonalityKeyForText = Object.keys(personalityScores).reduce((a,b) => personalityScores[a] > personalityScores[b] ? a : b);
+    if (PERSONALITY_DOMAIN_DISPLAY_NAMES_PT[dominantPersonalityKeyForText]) {
+        keyTraitsSummaryList.push("seu traço de " + PERSONALITY_DOMAIN_DISPLAY_NAMES_PT[dominantPersonalityKeyForText].toLowerCase());
+    }
+    // Find the actual dominant motivation for the text
+    let dominantMotivationKeyForText = Object.keys(motivationScores).reduce((a,b) => motivationScores[a] > motivationScores[b] ? a : b);
+    if (MOTIVATION_DISPLAY_NAMES_PT[dominantMotivationKeyForText]) {
+         keyTraitsSummaryList.push("sua motivação por " + MOTIVATION_DISPLAY_NAMES_PT[dominantMotivationKeyForText].toLowerCase());
+    }
+    
+    if (keyTraitsSummaryList.length > 0) {
+        archetypeKeyTraitsAndMotivationsEl.textContent = keyTraitsSummaryList.join(" e ");
+    } else {
+        archetypeKeyTraitsAndMotivationsEl.textContent = "suas preferências únicas";
+    }
+
+
+    // --- 5. Genre Affinity Logic (Simplified) ---
+    let genreAffinity = {};
+    GENRES.forEach(g => genreAffinity[g.name] = 0); 
+
+    // Example: Boost genres related to the main archetype
+    if(mainArchetype.displayName === "O Explorador") {
+        genreAffinity["RPG"] = (genreAffinity["RPG"] || 0) + 3;
+        genreAffinity["Aventura"] = (genreAffinity["Aventura"] || 0) + 2.5;
+        genreAffinity["Mundo Aberto (Sandbox)"] = (genreAffinity["Mundo Aberto (Sandbox)"] || 0) + 2;
+    } else if (mainArchetype.displayName === "O Estrategista") {
+        genreAffinity["Estratégia"] = (genreAffinity["Estratégia"] || 0) + 3;
+        genreAffinity["Quebra-Cabeça (Puzzle)"] = (genreAffinity["Quebra-Cabeça (Puzzle)"] || 0) + 2;
+    } else if (mainArchetype.displayName === "O Competidor") {
+        genreAffinity["Tiro (Shooter)"] = (genreAffinity["Tiro (Shooter)"] || 0) + 2.5;
+        genreAffinity["Battle Royale"] = (genreAffinity["Battle Royale"] || 0) + 2.5;
+        genreAffinity["Luta"] = (genreAffinity["Luta"] || 0) + 2;
+    } else if (mainArchetype.displayName === "O Colecionador") {
+         genreAffinity["RPG"] = (genreAffinity["RPG"] || 0) + 2;
+         genreAffinity["MMO"] = (genreAffinity["MMO"] || 0) + 1.5;
+    } else if (mainArchetype.displayName === "O Artista") {
+        genreAffinity["Mundo Aberto (Sandbox)"] = (genreAffinity["Mundo Aberto (Sandbox)"] || 0) + 2.5;
+        genreAffinity["Simulação"] = (genreAffinity["Simulação"] || 0) + 2;
+        genreAffinity["MMO"] = (genreAffinity["MMO"] || 0) + 1;
+    }
+
+    // Add some general motivation boosts (can overlap or refine above)
+    if (motivationScores.Fantasy > 3.8) genreAffinity["RPG"] = (genreAffinity["RPG"] || 0) + 2;
+    if (motivationScores.Story > 3.8) { genreAffinity["RPG"] = (genreAffinity["RPG"] || 0) + 1.5; genreAffinity["Aventura"] = (genreAffinity["Aventura"] || 0) + 1.5; }
+    if (motivationScores.Excitement > 3.8) { genreAffinity["Ação"] = (genreAffinity["Ação"] || 0) + 1.5; genreAffinity["Tiro (Shooter)"] = (genreAffinity["Tiro (Shooter)"] || 0) + 1; }
+    if (motivationScores.Competition > 3.8) { genreAffinity["Tiro (Shooter)"] = (genreAffinity["Tiro (Shooter)"] || 0) + 1; genreAffinity["Luta"] = (genreAffinity["Luta"] || 0) + 1.5; }
+
+
+    const sortedGenres = Object.entries(genreAffinity)
+        .filter(([,score]) => score > 0.1) 
+        .sort(([,a],[,b]) => b-a);
+        
+    const recommendationsHtml = document.getElementById('genreRecommendations');
+    recommendationsHtml.innerHTML = '';
+    
+    if (sortedGenres.length > 0) {
+        sortedGenres.slice(0,3).forEach(([genreName, score]) => {
+            const genreData = GENRES.find(g => g.name === genreName);
+            const examples = GAME_EXAMPLES[genreName] || { classic: "N/A", modern: "N/A" };
+            recommendationsHtml.innerHTML += `
+                <div class="p-4 bg-gray-800 rounded-lg shadow-md border border-gray-700 hover:border-emerald-500 transition-all duration-200">
+                    <h4 class="text-xl font-semibold text-emerald-300">${genreName}</h4>
+                    <p class="text-sm text-gray-400 mb-2">${genreData ? genreData.description : 'Um tipo de jogo divertido.'}</p>
+                    <p class="text-xs text-gray-500"><strong>Clássico:</strong> ${examples.classic}</p>
+                    <p class="text-xs text-gray-500"><strong>Moderno:</strong> ${examples.modern}</p>
+                </div>
+            `;
+        });
+    } else {
+        recommendationsHtml.innerHTML = `<p class="text-gray-300">Não conseguimos identificar gêneros específicos com alta confiança com base em suas respostas. Que tal explorar uma variedade de jogos gratuitos para descobrir o que você gosta!</p>`;
+    }
+    
+    const chartCtx = document.getElementById('resultsChart').getContext('2d');
+    const radarChartLabels = sortedGenres.slice(0, Math.min(5, sortedGenres.length)).map(g => g[0]);
+    const radarChartData = sortedGenres.slice(0, Math.min(5, sortedGenres.length)).map(g => g[1]); 
+    
+    if (radarChartLabels.length === 0) {
+        radarChartLabels.push("Sem Afinidades Fortes");
+        radarChartData.push(0);
+    }
+
+    if (window.resultsChartInstance) {
+        window.resultsChartInstance.destroy();
+    }
+    window.resultsChartInstance = new Chart(chartCtx, {
+        type: 'radar', 
+        data: {
+            labels: radarChartLabels,
+            datasets: [{
+                label: 'Afinidade com Gênero',
+                data: radarChartData,
+                backgroundColor: 'rgba(16, 185, 129, 0.3)', 
+                borderColor: '#10b981', 
+                pointBackgroundColor: '#10b981',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: '#10b981',
+                borderWidth: 2.5,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                r: { 
+                    angleLines: { color: 'rgba(107, 114, 128, 0.5)' }, 
+                    grid: { color: 'rgba(55, 65, 81, 0.7)' }, 
+                    pointLabels: { 
+                        color: '#d1d5db', 
+                        font: { size: 13, weight: '500', family: 'Inter' } 
+                    },
+                    ticks: {
+                        display: false, 
+                        stepSize: Math.ceil(Math.max(...radarChartData, 1) / 3) || 1, 
+                    },
+                    suggestedMin: 0,
+                    suggestedMax: Math.max(5, ...radarChartData.map(s => Math.ceil(s + 1))) 
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                title: {
+                    display: true,
+                    text: 'Suas Maiores Afinidades com Gêneros',
+                    color: '#e5e7eb',
+                    font: { size: 18, weight: '600', family: 'Inter' },
+                    padding: { top: 10, bottom: 20 }
+                },
+                 tooltip: {
+                    backgroundColor: '#111827',
+                    titleColor: '#10b981',
+                    bodyColor: '#d1d5db',
+                    borderColor: '#374151',
+                    borderWidth:1,
+                    padding: 10,
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) { label += ': '; }
+                            if (context.parsed.r !== null) {
+                                label += context.parsed.r.toFixed(1); 
+                            }
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+</script>
+</body>
+</html>
